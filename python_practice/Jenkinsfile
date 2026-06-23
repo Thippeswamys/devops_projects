@@ -3,7 +3,7 @@ pipeline {
     
     environment {
         AWS_ACCOUNT_ID = '360831509035' // Replace with your actual 12-digit AWS Account ID
-        AWS_DEFAULT_REGION = 'app-south-1' // Replace with your chosen region
+        AWS_DEFAULT_REGION = 'ap-south-1' // Replace with your chosen region
         IMAGE_NAME = 'my-python-app'
         IMAGE_TAG = "${BUILD_NUMBER}"
         ECR_REGISTRY = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com"
