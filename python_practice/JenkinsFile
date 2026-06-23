@@ -1,0 +1,79 @@
+ipipeline {
+    agent any
+    
+    environment {
+        AWS_ACCOUNT_ID = '360831509035' // Replace with your actual 12-digit AWS Account ID
+        AWS_DEFAULT_REGION = 'app-south-1' // Replace with your chosen region
+        IMAGE_NAME = 'my-python-app'
+        IMAGE_TAG = "${BUILD_NUMBER}"
+        ECR_REGISTRY = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com"
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                echo 'Fetching latest changes from GitHub...'
+                checkout scm
+            }
+        }
+        
+        stage('Create ECR Repo if missing') {
+            steps {
+                echo 'Checking if ECR Repository exists...'
+                script {
+                    // Try to describe the repository. If it errors out, create it.
+                    def status = sh(
+                        script: "aws ecr describe-repositories --repository-names ${IMAGE_NAME} --region ${AWS_DEFAULT_REGION} 2>&1",
+                        returnStatus: true
+                    )
+                    
+                    if (status != 0) {
+                        echo "Repository ${IMAGE_NAME} does not exist. Creating it now..."
+                        sh "aws ecr create-repository --repository-name ${IMAGE_NAME} --region ${AWS_DEFAULT_REGION}"
+                    } else {
+                        echo "Repository ${IMAGE_NAME} already exists. Skipping creation."
+                    }
+                }
+            }
+        }
+        
+        stage('Test App') {
+            steps {
+                echo 'Testing Python local output inside python_practice subfolder...'
+                // Switches context into the subfolder to find app.py
+                dir('python_practice') {
+                    sh 'python3 app.py'
+                }
+            }
+        }
+
+        stage('Docker Build') {
+            steps {
+                echo 'Building Docker image from python_practice context...'
+                // Switches context into the subfolder to find the Dockerfile
+                dir('python_practice') {
+                    sh "docker build -t ${ECR_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} ."
+                    sh "docker tag ${ECR_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} ${ECR_REGISTRY}/${IMAGE_NAME}:latest"
+                }
+            }
+        }
+
+        stage('ECR Login & Push') {
+            steps {
+                echo 'Logging into Amazon ECR and pushing image...'
+                sh "aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | docker login --username AWS --password-stdin ${ECR_REGISTRY}"
+                sh "docker push ${ECR_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
+                sh "docker push ${ECR_REGISTRY}/${IMAGE_NAME}:latest"
+            }
+        }
+    }
+    
+    post {
+        always {
+            echo 'Cleaning up local Docker images to save disk space...'
+            sh "docker rmi ${ECR_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} || true"
+            sh "docker rmi ${ECR_REGISTRY}/${IMAGE_NAME}:latest || true"
+        }
+    }
+}
+
