@@ -1,9 +1,9 @@
-pipeline {
+ipipeline {
     agent any
     
     environment {
-        AWS_ACCOUNT_ID = '123456789012' // Replace with your actual 12-digit AWS Account ID
-        AWS_DEFAULT_REGION = 'us-east-1' // Replace with your chosen region
+        AWS_ACCOUNT_ID = '360831509035' // Replace with your actual 12-digit AWS Account ID
+        AWS_DEFAULT_REGION = 'app-south-1' // Replace with your chosen region
         IMAGE_NAME = 'my-python-app'
         IMAGE_TAG = "${BUILD_NUMBER}"
         ECR_REGISTRY = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com"
@@ -39,16 +39,22 @@ pipeline {
         
         stage('Test App') {
             steps {
-                echo 'Testing Python local output...'
-                sh 'python3 app.py'
+                echo 'Testing Python local output inside python_practice subfolder...'
+                // Switches context into the subfolder to find app.py
+                dir('python_practice') {
+                    sh 'python3 app.py'
+                }
             }
         }
 
         stage('Docker Build') {
             steps {
-                echo 'Building Docker image...'
-                sh "docker build -t ${ECR_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} ."
-                sh "docker tag ${ECR_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} ${ECR_REGISTRY}/${IMAGE_NAME}:latest"
+                echo 'Building Docker image from python_practice context...'
+                // Switches context into the subfolder to find the Dockerfile
+                dir('python_practice') {
+                    sh "docker build -t ${ECR_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} ."
+                    sh "docker tag ${ECR_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} ${ECR_REGISTRY}/${IMAGE_NAME}:latest"
+                }
             }
         }
 
@@ -70,3 +76,4 @@ pipeline {
         }
     }
 }
+
